@@ -1,0 +1,81 @@
+name: Platform Measurements
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'plt-msr-v*'  # e.g., plt-msr-v1.0.0
+    paths:
+      - 'platform/configs/**'
+      - 'platform/scripts/measure.sh'
+      - 'platform/scripts/compute-acpi-hash.sh'
+      - '.github/workflows/platform-measurements.yml'
+  pull_request:
+    paths:
+      - 'platform/configs/**'
+      - 'platform/scripts/measure.sh'
+      - 'platform/scripts/compute-acpi-hash.sh'
+      - '.github/workflows/platform-measurements.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  measure:
+    name: Compute Measurements
+    runs-on: ubuntu-latest
+    outputs:
+      measurements_json: ${{ steps.measure.outputs.json }}
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Compute measurements
+        id: measure
+        run: |
+          cd platform/scripts
+          ./measure.sh
+          
+          # Output JSON for use in release body
+          echo "json<<EOF" >> "$GITHUB_OUTPUT"
+          cat ../out/platform-measurements.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Display measurements
+        run: |
+          echo "=== Platform Measurements ==="
+          cat platform/out/platform-measurements.json | jq .
+
+      - name: Attest measurements
+        if: startsWith(github.ref, 'refs/tags/plt-msr-v')
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
+        with:
+          subject-path: 'platform/out/platform-measurements.json'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        with:
+          name: platform-measurements
+          path: platform/out/platform-measurements.json
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/measurements-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY="## Platform Measurements ${{ github.ref_name }}
+
+          \`\`\`json
+          $(cat platform/out/platform-measurements.json)
+          \`\`\`"
+          
+          gh release create "${{ github.ref_name }}" \
+            --title "Platform Measurements ${{ github.ref_name }}" \
+            --notes "$BODY" \
+            platform/out/platform-measurements.json
