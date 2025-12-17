@@ -1,4 +1,4 @@
-name: Build Kernel + NVIDIA
+name: Build Kernel + NVIDIA Drivers
 
 on:
   push:
