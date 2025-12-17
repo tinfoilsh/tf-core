@@ -76,6 +76,7 @@ jobs:
           \`\`\`"
           
           gh release create "${{ github.ref_name }}" \
+            --latest=false \
             --title "Platform Measurements ${{ github.ref_name }}" \
             --notes "$BODY" \
             platform/out/platform-measurements.json
