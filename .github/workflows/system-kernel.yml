@@ -65,7 +65,10 @@ jobs:
         id: checksums
         run: |
           cd system/build
-          sha256sum packages/*.deb nvidia-modules.tar.gz | tee checksums.sha256
+          # Generate checksums without path prefixes for portability
+          (cd packages && sha256sum *.deb) > checksums.sha256
+          sha256sum nvidia-modules.tar.gz >> checksums.sha256
+          cat checksums.sha256
 
       - name: Upload artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
