@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - 'platform/oak/**'
+      - '.github/workflows/platform-stage0.yml'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +52,7 @@ jobs:
           echo "${SHA}  stage0_bin" > out/stage0_bin.sha256
 
       - name: Attest stage0_bin
+        if: startsWith(github.ref, 'refs/tags/stage0-v')
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
           subject-path: 'out/stage0_bin'
