@@ -9,3 +9,7 @@
 [submodule "system/open-gpu-kernel-modules"]
 	path = system/open-gpu-kernel-modules
 	url = https://github.com/NVIDIA/open-gpu-kernel-modules.git
+[submodule "application/pri-build-action"]
+	path = application/pri-build-action
+	url = git@github.com:tinfoilsh/pri-build-action.git
+	branch = jules/stage0
