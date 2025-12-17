@@ -1,0 +1,76 @@
+name: Build Stage0
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'stage0-v*'          # Stage0 releases
+    paths:
+      - 'platform/oak/**'
+      - '.github/workflows/platform-stage0.yml'
+  pull_request:
+    paths:
+      - 'platform/oak/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build Stage0
+    runs-on: ubuntu-latest
+    outputs:
+      sha256: ${{ steps.hash.outputs.sha256 }}
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: recursive
+
+      - name: Install Bazel
+        run: |
+          sudo curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.22.0/bazelisk-linux-amd64 \
+            -o /usr/local/bin/bazel
+          sudo chmod +x /usr/local/bin/bazel
+
+      - name: Build stage0_bin
+        run: |
+          cd platform/oak
+          bazel build --config=release //stage0_bin:stage0_bin
+
+      - name: Extract artifacts
+        id: hash
+        run: |
+          mkdir -p out
+          cp platform/oak/bazel-bin/stage0_bin/stage0_bin out/
+          SHA=$(sha256sum out/stage0_bin | awk '{print $1}')
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "${SHA}  stage0_bin" > out/stage0_bin.sha256
+
+      - name: Attest stage0_bin
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: 'out/stage0_bin'
+
+      # Always upload artifact (for push/PR)
+      - name: Upload artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: stage0
+          path: out/
+
+      # Create release only on tag
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/stage0-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "Stage0 ${{ github.ref_name }}" \
+            --notes "**SHA256:** \`${{ steps.hash.outputs.sha256 }}\`" \
+            out/stage0_bin \
+            out/stage0_bin.sha256
+            
