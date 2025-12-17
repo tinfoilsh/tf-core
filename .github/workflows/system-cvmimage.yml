@@ -190,6 +190,7 @@ jobs:
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
         with:
           subject-path: |
+            system/cvmimage/out/manifest.json
             system/cvmimage/out/tinfoilcvm.initrd
             system/cvmimage/out/tinfoilcvm.vmlinuz
             system/cvmimage/out/tinfoilcvm.raw
@@ -215,10 +216,8 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             -R ${{ github.repository }} \
             --latest=false \
-            --title "CVM Image ${{ github.ref_name }}" \
-            --notes "## CVM Image ${{ github.ref_name }}
-
-          Built using kernel release: \`${{ steps.kernel.outputs.release }}\`
+            --title "${{ github.ref_name }}" \
+            --notes "Built using kernel release: \`${{ steps.kernel.outputs.release }}\`
 
           ### Downloads
           - Kernel: https://images.tinfoil.sh/cvm/tinfoilcvm.vmlinuz
@@ -227,7 +226,7 @@ jobs:
 
           ### Manifest
           \`\`\`json
-          ${{ steps.manifest.outputs.manifest }}
+          $(cat manifest.json)
           \`\`\`" \
             manifest.json \
             checksums.sha256
