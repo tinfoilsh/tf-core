@@ -71,6 +71,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" \
+            --latest=false \
             --title "Stage0 ${{ github.ref_name }}" \
             --notes "**SHA256:** \`${{ steps.hash.outputs.sha256 }}\`" \
             out/stage0_bin \

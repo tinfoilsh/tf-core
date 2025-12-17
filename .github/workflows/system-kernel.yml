@@ -93,6 +93,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" \
+            --latest=false \
             --title "Kernel + NVIDIA Drivers ${{ github.ref_name }}" \
             --notes "## Checksums
           \`\`\`
