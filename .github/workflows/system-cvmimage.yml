@@ -34,6 +34,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Ensure gh CLI supports attestation (>= 2.67.0)
+        run: |
+          GH_VERSION=$(gh --version | head -1 | awk '{print $3}')
+          MIN_VERSION="2.67.0"
+          echo "gh version: $GH_VERSION (minimum: $MIN_VERSION)"
+          
+          if [ "$(printf '%s\n' "$MIN_VERSION" "$GH_VERSION" | sort -V | head -1)" != "$MIN_VERSION" ]; then
+            echo "ERROR: gh CLI version $GH_VERSION is too old. Need >= $MIN_VERSION for attestation support."
+            exit 1
+          fi
+
       - name: Determine kernel release
         id: kernel
         env:
@@ -78,27 +89,13 @@ jobs:
           verify_artifact() {
             local artifact="$1"
             echo "Verifying $artifact..."
-            
-            # Get attestation and verify
-            RESULT=$(gh attestation verify "$artifact" -R ${{ github.repository }} --format json 2>&1) || {
+            gh attestation verify "$artifact" \
+              -R ${{ github.repository }} \
+              --deny-self-hosted-runners || {
               echo "ERROR: Attestation verification failed for $artifact"
               exit 1
             }
-            
-            # Check runner environment is github-hosted
-            RUNNER_ENV=$(echo "$RESULT" | jq -r '.[0].verificationResult.signature.certificate.extensions.runnerEnvironment // empty')
-            
-            if [ -z "$RUNNER_ENV" ]; then
-              echo "ERROR: No runner environment in certificate for $artifact"
-              exit 1
-            fi
-            
-            if [ "$RUNNER_ENV" != "github-hosted" ]; then
-              echo "ERROR: Artifact $artifact was NOT built on github-hosted runner (got: $RUNNER_ENV)"
-              exit 1
-            fi
-            
-            echo "✓ $artifact: verified, built on github-hosted runner"
+            echo "✓ $artifact verified"
           }
           
           # Verify checksums first
