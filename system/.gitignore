@@ -1,0 +1,5 @@
+/build
+/noble
+linux-*.deb
+linux-*.changes
+linux-*.buildinfo

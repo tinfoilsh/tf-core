@@ -1,0 +1,101 @@
+name: Build Kernel + NVIDIA
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'kernel-v*'
+    paths:
+      - 'system/configs/kernel.conf'
+      - 'system/configs/tinfoil-linux-config'
+      - 'system/scripts/build_kernel.sh'
+      - 'system/open-gpu-kernel-modules'
+      - 'system/scripts/build_nvidia.sh'
+      - '.github/workflows/system-kernel.yml'
+  pull_request:
+    paths:
+      - 'system/configs/kernel.conf'
+      - 'system/configs/tinfoil-linux-config'
+      - 'system/scripts/build_kernel.sh'
+      - 'system/open-gpu-kernel-modules'
+      - 'system/scripts/build_nvidia.sh'
+      - '.github/workflows/system-kernel.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build Kernel + NVIDIA Drivers
+    runs-on: xlarge
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc kmod cpio flex \
+            libncurses5-dev libelf-dev libssl-dev bison dwarves zstd \
+            debhelper rsync python3 libdw-dev
+
+      - name: Build kernel
+        run: |
+          cd system/scripts
+          chmod +x build_kernel.sh
+          ./build_kernel.sh
+
+      - name: Build NVIDIA modules
+        run: |
+          cd system/scripts
+          chmod +x build_nvidia.sh
+          ./build_nvidia.sh
+
+      - name: Package NVIDIA modules
+        run: |
+          cd system/build
+          tar -czvf nvidia-modules.tar.gz nvidia-modules/
+
+      - name: Generate checksums
+        id: checksums
+        run: |
+          cd system/build
+          sha256sum packages/*.deb nvidia-modules.tar.gz | tee checksums.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        with:
+          name: kernel-nvidia
+          path: |
+            system/build/packages/*.deb
+            system/build/nvidia-modules.tar.gz
+            system/build/checksums.sha256
+
+      - name: Attest artifacts
+        if: startsWith(github.ref, 'refs/tags/kernel-v')
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
+        with:
+          subject-path: |
+            system/build/packages/*.deb
+            system/build/nvidia-modules.tar.gz
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/kernel-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd system/build
+          gh release create "${{ github.ref_name }}" \
+            --title "Kernel + NVIDIA Drivers ${{ github.ref_name }}" \
+            --notes "## Checksums
+          \`\`\`
+          $(cat checksums.sha256)
+          \`\`\`" \
+            system/build/packages/*.deb \
+            system/build/nvidia-modules.tar.gz \
+            system/build/checksums.sha256

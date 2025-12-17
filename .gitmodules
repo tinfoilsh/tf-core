@@ -2,3 +2,10 @@
 	path = platform/oak
 	url = git@github.com:tinfoilsh/oak.git
 	branch = jules/vmpck0
+[submodule "system/cvmimage"]
+	path = system/cvmimage
+	url = git@github.com:tinfoilsh/cvmimage.git
+	branch = jules/stage0
+[submodule "system/open-gpu-kernel-modules"]
+	path = system/open-gpu-kernel-modules
+	url = https://github.com/NVIDIA/open-gpu-kernel-modules.git
