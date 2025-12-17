@@ -1,0 +1,217 @@
+name: Build CVM Image
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'cvmimage-v*'
+    paths:
+      - 'system/cvmimage'
+      - '.github/workflows/system-cvmimage.yml'
+  pull_request:
+    paths:
+      - 'system/cvmimage'
+      - '.github/workflows/system-cvmimage.yml'
+  workflow_dispatch:
+    inputs:
+      kernel_release:
+        description: 'Kernel release tag (e.g., kernel-v6.14.0-28). Leave empty for latest.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build CVM Image
+    runs-on: xlarge
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          submodules: recursive
+
+      - name: Determine kernel release
+        id: kernel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ inputs.kernel_release }}" ]; then
+            KERNEL_RELEASE="${{ inputs.kernel_release }}"
+          else
+            # Get latest kernel release using JSON for reliability
+            KERNEL_RELEASE=$(gh release list --json tagName \
+              --jq '[.[] | select(.tagName | startswith("kernel-v"))][0].tagName')
+          fi
+          
+          if [ -z "$KERNEL_RELEASE" ] || [ "$KERNEL_RELEASE" = "null" ]; then
+            echo "ERROR: No kernel release found!"
+            exit 1
+          fi
+          
+          echo "release=$KERNEL_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "Using kernel release: $KERNEL_RELEASE"
+
+      - name: Download kernel artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/kernel-artifacts
+          
+          echo "Downloading from release: ${{ steps.kernel.outputs.release }}"
+          gh release download "${{ steps.kernel.outputs.release }}" \
+            -p '*.deb' \
+            -p 'nvidia-modules.tar.gz' \
+            -p 'checksums.sha256' \
+            -D /tmp/kernel-artifacts/
+
+      - name: Verify artifacts with Sigstore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Verifying artifact attestations..."
+          cd /tmp/kernel-artifacts
+          
+          # Verify checksums first (fast, catches corruption)
+          echo "Verifying checksums..."
+          sha256sum -c checksums.sha256
+          
+          # Verify each .deb file with Sigstore
+          for deb in *.deb; do
+            echo "Verifying attestation for $deb..."
+            gh attestation verify "$deb" -R ${{ github.repository }} || {
+              echo "ERROR: Attestation verification failed for $deb"
+              exit 1
+            }
+          done
+          
+          # Verify NVIDIA modules with Sigstore
+          echo "Verifying attestation for nvidia-modules.tar.gz..."
+          gh attestation verify nvidia-modules.tar.gz -R ${{ github.repository }} || {
+            echo "ERROR: Attestation verification failed for nvidia-modules.tar.gz"
+            exit 1
+          }
+          
+          echo "✓ All artifacts verified successfully!"
+
+      - name: Install verified artifacts
+        run: |
+          # Create target directories
+          mkdir -p system/build/packages
+          mkdir -p system/build/nvidia-modules
+          
+          # Copy verified .deb packages
+          cp /tmp/kernel-artifacts/*.deb system/build/packages/
+          
+          # Extract verified NVIDIA modules
+          tar -xzf /tmp/kernel-artifacts/nvidia-modules.tar.gz -C system/build/
+          
+          # Cleanup temp
+          rm -rf /tmp/kernel-artifacts
+          
+          echo "Installed artifacts:"
+          ls -la system/build/packages/
+          ls -la system/build/nvidia-modules/
+
+      - name: Install mkosi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pipx ubuntu-keyring debian-archive-keyring make jq binutils
+          sudo pipx install git+https://github.com/systemd/mkosi.git
+          sudo pipx ensurepath
+
+      - name: Build CVM image
+        run: |
+          cd system/cvmimage
+          sudo /opt/pipx_bin/mkosi --image-version ${{ github.ref_name || 'dev' }}
+
+      - name: Fix permissions
+        run: |
+          cd system/cvmimage
+          sudo chmod 644 tinfoilcvm.*
+          sudo chown $USER:$USER tinfoilcvm.*
+
+      - name: Generate manifest
+        id: manifest
+        run: |
+          cd system/cvmimage
+          mkdir -p out
+          
+          # Generate manifest JSON
+          cat > out/manifest.json << EOF
+          {
+            "version": "${{ github.ref_name || 'dev' }}",
+            "kernel_release": "${{ steps.kernel.outputs.release }}",
+            "initrd_sha256": "$(sha256sum tinfoilcvm.initrd | awk '{print $1}')",
+            "vmlinuz_sha256": "$(sha256sum tinfoilcvm.vmlinuz | awk '{print $1}')",
+            "disk_sha256": "$(sha256sum tinfoilcvm.raw | awk '{print $1}')",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          
+          # Copy artifacts
+          cp tinfoilcvm.initrd tinfoilcvm.vmlinuz tinfoilcvm.raw out/
+          
+          # Generate checksums
+          cd out
+          sha256sum * | tee checksums.sha256
+          
+          # Output for release body
+          echo "manifest<<EOF" >> "$GITHUB_OUTPUT"
+          cat manifest.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v6.0.0
+        with:
+          name: cvmimage
+          path: |
+            system/cvmimage/out/
+
+      - name: Attest artifacts
+        if: startsWith(github.ref, 'refs/tags/cvmimage-v')
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
+        with:
+          subject-path: |
+            system/cvmimage/out/tinfoilcvm.initrd
+            system/cvmimage/out/tinfoilcvm.vmlinuz
+            system/cvmimage/out/tinfoilcvm.raw
+
+      - name: Upload to R2
+        if: startsWith(github.ref, 'refs/tags/cvmimage-v')
+        uses: ryand56/r2-upload-action@b801a390acbdeb034c5e684ff5e1361c06639e7c
+        with:
+          r2-account-id: ${{ secrets.R2_IMAGES_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.R2_IMAGES_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_IMAGES_SECRET_ACCESS_KEY }}
+          r2-bucket: ${{ secrets.R2_IMAGES_BUCKET }}
+          source-dir: system/cvmimage/out
+          destination-dir: ./cvm
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/cvmimage-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd system/cvmimage/out
+          
+          gh release create "${{ github.ref_name }}" \
+            --title "CVM Image ${{ github.ref_name }}" \
+            --notes "## CVM Image ${{ github.ref_name }}
+
+          Built using kernel release: \`${{ steps.kernel.outputs.release }}\`
+
+          ### Downloads
+          - Kernel: https://images.tinfoil.sh/cvm/tinfoilcvm.vmlinuz
+          - Initrd: https://images.tinfoil.sh/cvm/tinfoilcvm.initrd
+          - Disk: https://images.tinfoil.sh/cvm/tinfoilcvm.raw
+
+          ### Manifest
+          \`\`\`json
+          ${{ steps.manifest.outputs.manifest }}
+          \`\`\`" \
+            manifest.json \
+            checksums.sha256
