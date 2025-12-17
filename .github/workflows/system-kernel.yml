@@ -95,10 +95,10 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --latest=false \
             -R ${{ github.repository }} \
-            --title "Kernel + NVIDIA Drivers ${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
             --notes "## Checksums
           \`\`\`
-          $(cat checksums.sha256)
+          $(cat system/build/checksums.sha256)
           \`\`\`" \
             system/build/packages/*.deb \
             system/build/nvidia-modules.tar.gz \
