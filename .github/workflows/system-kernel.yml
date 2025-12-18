@@ -2,7 +2,6 @@ name: Build Kernel + NVIDIA Drivers
 
 on:
   push:
-    branches: [main]
     tags:
       - 'kernel-v*'
   pull_request:

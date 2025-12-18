@@ -2,7 +2,6 @@ name: Build CVM Image
 
 on:
   push:
-    branches: [main]
     tags:
       - 'cvmimage-v*'
   pull_request:
