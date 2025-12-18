@@ -158,9 +158,10 @@ jobs:
           {
             "version": "${{ github.ref_name || 'dev' }}",
             "kernel_release": "${{ steps.kernel.outputs.release }}",
-            "initrd_sha256": "$(sha256sum tinfoilcvm.initrd | awk '{print $1}')",
-            "vmlinuz_sha256": "$(sha256sum tinfoilcvm.vmlinuz | awk '{print $1}')",
-            "disk_sha256": "$(sha256sum tinfoilcvm.raw | awk '{print $1}')",
+            "root": "$(objcopy -O binary --only-section .cmdline tinfoilcvm.efi /dev/stdout | cut -d "=" -f 2)",
+            "initrd": "$(sha256sum tinfoilcvm.initrd | awk '{print $1}')",
+            "kernel": "$(sha256sum tinfoilcvm.vmlinuz | awk '{print $1}')",
+            "raw": "$(sha256sum tinfoilcvm.raw | awk '{print $1}')",
             "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
