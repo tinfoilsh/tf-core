@@ -2,7 +2,6 @@ name: Platform Measurements
 
 on:
   push:
-    branches: [main]
     tags:
       - 'plt-msr-v*'  # e.g., plt-msr-v1.0.0
   pull_request:
