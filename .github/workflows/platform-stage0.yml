@@ -60,17 +60,49 @@ jobs:
           name: stage0
           path: out/
 
+      - name: Prepare versioned artifacts
+        if: startsWith(github.ref, 'refs/tags/stage0-v')
+        run: |
+          cd out
+          # Extract version from tag (stage0-v0.0.2 -> v0.0.2)
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#stage0-}"
+          
+          mv stage0_bin "stage0-${VERSION}.fd"
+          mv stage0_bin.sha256 "stage0-${VERSION}.fd.sha256"
+          
+          echo "Versioned artifacts:"
+          ls -la
+
+      - name: Upload to R2
+        if: startsWith(github.ref, 'refs/tags/stage0-v')
+        uses: ryand56/r2-upload-action@b801a390acbdeb034c5e684ff5e1361c06639e7c
+        with:
+          r2-account-id: ${{ secrets.R2_IMAGES_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.R2_IMAGES_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_IMAGES_SECRET_ACCESS_KEY }}
+          r2-bucket: ${{ secrets.R2_IMAGES_BUCKET }}
+          source-dir: out
+          destination-dir: ./fw
+
       # Create release only on tag
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/stage0-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Extract version from tag (stage0-v0.0.2 -> v0.0.2)
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#stage0-}"
+          
           gh release create "${{ github.ref_name }}" \
             --latest=false \
             -R ${{ github.repository }} \
             --title "${{ github.ref_name }}" \
-            --notes "**SHA256:** \`${{ steps.hash.outputs.sha256 }}\`" \
-            out/stage0_bin \
-            out/stage0_bin.sha256
+            --notes "**SHA256:** \`${{ steps.hash.outputs.sha256 }}\`
+          
+          ### Download
+          - Firmware: https://images.tinfoil.sh/fw/stage0-${VERSION}.fd" \
+            out/stage0-${VERSION}.fd \
+            out/stage0-${VERSION}.fd.sha256
             
