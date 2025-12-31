@@ -129,7 +129,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pipx ubuntu-keyring debian-archive-keyring make jq binutils
-          sudo pipx install git+https://github.com/systemd/mkosi.git
+          sudo pipx install git+https://github.com/systemd/mkosi.git@v25.3
           sudo pipx ensurepath
 
       - name: Build CVM image
