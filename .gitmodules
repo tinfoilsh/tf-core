@@ -1,7 +1,3 @@
-[submodule "platform/oak"]
-	path = platform/oak
-	url = git@github.com:tinfoilsh/oak.git
-	branch = jules/vmpck0
 [submodule "system/cvmimage"]
 	path = system/cvmimage
 	url = git@github.com:tinfoilsh/cvmimage.git
