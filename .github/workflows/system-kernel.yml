@@ -9,7 +9,7 @@ on:
       - 'system/configs/kernel.conf'
       - 'system/configs/tinfoil-linux-config'
       - 'system/scripts/build_kernel.sh'
-      - 'system/open-gpu-kernel-modules'
+      - 'system/configs/nvidia.conf'
       - 'system/scripts/build_nvidia.sh'
       - '.github/workflows/system-kernel.yml'
   workflow_dispatch:
