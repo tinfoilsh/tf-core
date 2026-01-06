@@ -211,14 +211,14 @@ jobs:
 
       - name: Upload to R2
         if: startsWith(github.ref, 'refs/tags/cvmimage-v')
-        uses: ryand56/r2-upload-action@b801a390acbdeb034c5e684ff5e1361c06639e7c
-        with:
-          r2-account-id: ${{ secrets.R2_IMAGES_ACCOUNT_ID }}
-          r2-access-key-id: ${{ secrets.R2_IMAGES_ACCESS_KEY_ID }}
-          r2-secret-access-key: ${{ secrets.R2_IMAGES_SECRET_ACCESS_KEY }}
-          r2-bucket: ${{ secrets.R2_IMAGES_BUCKET }}
-          source-dir: system/cvmimage/out
-          destination-dir: ./cvm
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_IMAGES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_IMAGES_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.R2_IMAGES_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          for file in system/cvmimage/out/*; do
+            aws s3 cp "$file" "s3://${{ secrets.R2_IMAGES_BUCKET }}/cvm/$(basename "$file")"
+          done
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/cvmimage-v')
