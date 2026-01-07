@@ -28,7 +28,15 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: |
+          # Use Ubuntu snapshot to pin packages
+          SNAPSHOT_DATE="20250107T000000Z"
+          echo "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/${SNAPSHOT_DATE} noble main restricted universe multiverse" | sudo tee /etc/apt/sources.list
+          echo "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/${SNAPSHOT_DATE} noble-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/${SNAPSHOT_DATE} noble-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+    
+          sudo apt-get update
+          sudo apt-get install -y jq
 
       - name: Compute measurements
         id: measure
