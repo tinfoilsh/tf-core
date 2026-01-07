@@ -129,7 +129,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pipx ubuntu-keyring debian-archive-keyring make jq binutils
-          sudo pipx install git+https://github.com/systemd/mkosi.git@v25.3
+          sudo pipx install git+https://github.com/systemd/mkosi.git@54c625c380ef5500f17460981a3c67b109b6a847 #v25.3
           sudo pipx ensurepath
 
       - name: Build CVM image
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload artifacts
         if: "!startsWith(github.ref, 'refs/tags/cvmimage-v')"
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         with:
           name: cvmimage
           path: |
